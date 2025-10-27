@@ -1,5 +1,7 @@
 /// Flutter Chart Widget - integrates chartlib with Flutter's rendering system.
 
+import 'dart:math' as math;
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 import 'package:chartlib/chartlib.dart';
@@ -37,6 +39,13 @@ class ChartWidget extends StatefulWidget {
   /// Chart padding (space for axes and labels)
   final ChartPadding? padding;
 
+  /// Callback fired whenever the visible chart range changes (zoom/pan).
+  final void Function(DateTime start, DateTime end)? onViewportChanged;
+
+  /// Callback fired when the pointer hovers over the chart. Passing `null`
+  /// indicates the pointer exited the chart area.
+  final void Function(ChartHoverEvent? event)? onHover;
+
   const ChartWidget({
     super.key,
     required this.dataManager,
@@ -47,10 +56,21 @@ class ChartWidget extends StatefulWidget {
     this.width,
     this.height,
     this.padding,
+    this.onViewportChanged,
+    this.onHover,
   });
 
   @override
   State<ChartWidget> createState() => _ChartWidgetState();
+}
+
+/// Pointer hover details emitted by [ChartWidget].
+class ChartHoverEvent {
+  const ChartHoverEvent({required this.time, this.price, this.candle});
+
+  final DateTime time;
+  final double? price;
+  final OHLCData? candle;
 }
 
 /// Sub-pane configuration
@@ -72,6 +92,8 @@ class _ChartWidgetState extends State<ChartWidget> {
   Chart? _chart;
   bool _isInitialized = false;
   String? _error;
+  ChartPadding? _resolvedPadding;
+  Size? _lastPaintSize;
 
   @override
   void initState() {
@@ -103,7 +125,9 @@ class _ChartWidgetState extends State<ChartWidget> {
   Future<void> _initializeChart(Size size) async {
     if (_isInitialized) return;
 
-    print('[ChartWidget._initializeChart] Starting chart initialization with size: ${size.width}x${size.height}');
+    print(
+      '[ChartWidget._initializeChart] Starting chart initialization with size: ${size.width}x${size.height}',
+    );
 
     // CRITICAL: Reset dataManager state before creating new chart
     // This ensures fresh data loading when widget rebuilds (e.g., on study toggles)
@@ -111,23 +135,20 @@ class _ChartWidgetState extends State<ChartWidget> {
       print('[ChartWidget._initializeChart] Resetting SampleDataManager state');
       (widget.dataManager as SampleDataManager).reset();
     } else if (widget.dataManager is SimulatorDataManager) {
-      print('[ChartWidget._initializeChart] Resetting SimulatorDataManager state');
+      print(
+        '[ChartWidget._initializeChart] Resetting SimulatorDataManager state',
+      );
       (widget.dataManager as SimulatorDataManager).reset();
     }
 
     try {
-      final chartSize = ChartSize(
-        width: size.width,
-        height: size.height,
-      );
+      final chartSize = ChartSize(width: size.width, height: size.height);
 
-      final chartPadding = widget.padding ??
-          const ChartPadding(
-            left: 60,
-            right: 80,
-            top: 10,
-            bottom: 40,
-          );
+      final chartPadding =
+          widget.padding ??
+          const ChartPadding(left: 60, right: 80, top: 10, bottom: 40);
+
+      _resolvedPadding = chartPadding;
 
       // Create a temporary compositor (will be replaced during paint)
       final tempCompositor = _TempCompositor();
@@ -164,14 +185,15 @@ class _ChartWidgetState extends State<ChartWidget> {
       // Override render callback to trigger Flutter setState()
       // This ensures Flutter repaints when chart receives real-time updates
       chart.chartController.setOnRender(() {
-        print('[ChartWidget.onRender] Render callback fired');
-        chart.multiPaneRenderer.render();
-        print('[ChartWidget.onRender] multiPaneRenderer.render() completed');
-        // Trigger Flutter repaint
-        if (mounted) {
-          print('[ChartWidget.onRender] Calling setState() to trigger Flutter repaint');
-          setState(() {});
+        if (!mounted) {
+          return;
         }
+
+        print('[ChartWidget.onRender] Render callback fired');
+
+        // Trigger Flutter repaint; render occurs inside CustomPainter.paint
+        setState(() {});
+        _notifyViewportChanged();
       });
 
       // Initialize with data
@@ -184,6 +206,8 @@ class _ChartWidgetState extends State<ChartWidget> {
         _isInitialized = true;
         _error = null;
       });
+
+      _notifyViewportChanged();
     } catch (e, stackTrace) {
       print('[ChartWidget._initializeChart] ERROR: $e');
       print('[ChartWidget._initializeChart] Stack trace: $stackTrace');
@@ -201,10 +225,8 @@ class _ChartWidgetState extends State<ChartWidget> {
       height: widget.height,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final size = Size(
-            constraints.maxWidth,
-            constraints.maxHeight,
-          );
+          final size = Size(constraints.maxWidth, constraints.maxHeight);
+          _lastPaintSize = size;
 
           // Initialize chart if needed
           if (!_isInitialized && _chart == null) {
@@ -223,24 +245,23 @@ class _ChartWidgetState extends State<ChartWidget> {
 
           // Show loading while initializing
           if (!_isInitialized || _chart == null) {
-            return const Center(
-              child: Text('Loading chart...'),
-            );
+            return const Center(child: Text('Loading chart...'));
           }
 
           // Render chart
           return Listener(
             onPointerSignal: _handlePointerSignal,
-            child: GestureDetector(
-              onScaleStart: _handleScaleStart,
-              onScaleUpdate: _handleScaleUpdate,
-              onScaleEnd: _handleScaleEnd,
-              child: CustomPaint(
-                painter: _ChartPainter(
-                  chart: _chart!,
-                  theme: widget.theme,
+            child: MouseRegion(
+              onHover: _handleHover,
+              onExit: (_) => _emitHover(null),
+              child: GestureDetector(
+                onScaleStart: _handleScaleStart,
+                onScaleUpdate: _handleScaleUpdate,
+                onScaleEnd: _handleScaleEnd,
+                child: CustomPaint(
+                  painter: _ChartPainter(chart: _chart!, theme: widget.theme),
+                  size: size,
                 ),
-                size: size,
               ),
             ),
           );
@@ -252,10 +273,12 @@ class _ChartWidgetState extends State<ChartWidget> {
   // Gesture handling state
   double _lastScale = 1.0;
   Offset? _lastFocalPoint;
+  double _pendingPan = 0.0;
 
   void _handleScaleStart(ScaleStartDetails details) {
     _lastScale = 1.0;
     _lastFocalPoint = details.focalPoint;
+    _pendingPan = 0.0;
   }
 
   void _handleScaleUpdate(ScaleUpdateDetails details) {
@@ -270,10 +293,14 @@ class _ChartWidgetState extends State<ChartWidget> {
         // Zoom in
         _chart!.zoomIn(scaleDelta);
         setState(() {});
+        _notifyViewportChanged();
+        _pendingPan = 0.0; // reset accumulated pan since zoom changes state
       } else if (scaleDelta < 0.99) {
         // Zoom out
         _chart!.zoomOut(1 / scaleDelta);
         setState(() {});
+        _notifyViewportChanged();
+        _pendingPan = 0.0;
       }
     }
 
@@ -285,10 +312,13 @@ class _ChartWidgetState extends State<ChartWidget> {
       // Convert pixel delta to candle delta
       final boxWidth = _chart!.getBoxWidth();
       if (boxWidth > 0) {
-        final candleDelta = -(delta.dx / boxWidth).round();
+        _pendingPan += -(delta.dx / boxWidth);
+        final int candleDelta = _pendingPan.truncate();
         if (candleDelta != 0) {
+          _pendingPan -= candleDelta.toDouble();
           _chart!.pan(candleDelta);
           setState(() {});
+          _notifyViewportChanged();
         }
       }
     }
@@ -297,6 +327,8 @@ class _ChartWidgetState extends State<ChartWidget> {
   void _handleScaleEnd(ScaleEndDetails details) {
     _lastScale = 1.0;
     _lastFocalPoint = null;
+    _pendingPan = 0.0;
+    _notifyViewportChanged();
   }
 
   /// Handle mouse scroll wheel for zooming (desktop)
@@ -311,12 +343,138 @@ class _ChartWidgetState extends State<ChartWidget> {
         // Scroll down = zoom out
         _chart!.zoomOut(1.1);
         setState(() {});
+        _notifyViewportChanged();
       } else if (scrollDelta < 0) {
         // Scroll up = zoom in
         _chart!.zoomIn(1.1);
         setState(() {});
+        _notifyViewportChanged();
       }
     }
+  }
+
+  void _notifyViewportChanged() {
+    if (widget.onViewportChanged == null || _chart == null) {
+      return;
+    }
+
+    final candles = _chart!.timeSeriesStore.getAll();
+    if (candles.isEmpty) {
+      return;
+    }
+
+    final indices = _chart!.context.scales.getVisibleDomainIndices();
+    final startIndex = indices.startIndex.floor().clamp(0, candles.length - 1);
+    final endIndex = indices.endIndex.ceil().clamp(0, candles.length - 1);
+
+    final startTime = candles[startIndex].timestamp;
+    final endTime = candles[endIndex].timestamp;
+
+    widget.onViewportChanged?.call(startTime, endTime);
+  }
+
+  void _handleHover(PointerHoverEvent event) {
+    _emitHover(event.localPosition);
+  }
+
+  void _emitHover(Offset? position) {
+    if (widget.onHover == null) {
+      return;
+    }
+
+    if (position == null || _chart == null) {
+      widget.onHover?.call(null);
+      return;
+    }
+
+    final chart = _chart!;
+    final size = _lastPaintSize;
+    final padding =
+        _resolvedPadding ??
+        const ChartPadding(left: 60, right: 80, top: 10, bottom: 40);
+
+    if (size == null) {
+      widget.onHover?.call(null);
+      return;
+    }
+
+    final chartWidth = size.width - padding.left - padding.right;
+    final chartHeight = size.height - padding.top - padding.bottom;
+
+    if (chartWidth <= 0 || chartHeight <= 0) {
+      widget.onHover?.call(null);
+      return;
+    }
+
+    final localX = position.dx - padding.left;
+    final localY = position.dy - padding.top;
+
+    if (localX < 0 ||
+        localX > chartWidth ||
+        localY < 0 ||
+        localY > chartHeight) {
+      widget.onHover?.call(null);
+      return;
+    }
+
+    final timeScale = chart.context.scales.timeScale;
+    final priceScale = chart.context.scales.priceScale;
+
+    DateTime timestamp;
+    try {
+      timestamp = timeScale.invert(localX);
+    } catch (_) {
+      widget.onHover?.call(null);
+      return;
+    }
+
+    final price = priceScale.invert(localY);
+
+    final candles = chart.timeSeriesStore.getAll();
+    if (candles.isEmpty) {
+      widget.onHover?.call(
+        ChartHoverEvent(time: timestamp, price: price, candle: null),
+      );
+      return;
+    }
+
+    final nearest = _findNearestCandle(timestamp, candles);
+    widget.onHover?.call(
+      ChartHoverEvent(time: timestamp, price: price, candle: nearest),
+    );
+  }
+
+  OHLCData? _findNearestCandle(DateTime timestamp, List<OHLCData> candles) {
+    if (candles.isEmpty) {
+      return null;
+    }
+
+    final target = timestamp.millisecondsSinceEpoch;
+
+    var low = 0;
+    var high = candles.length - 1;
+
+    while (low <= high) {
+      final mid = (low + high) >> 1;
+      final midValue = candles[mid].timestamp.millisecondsSinceEpoch;
+      if (midValue == target) {
+        return candles[mid];
+      } else if (midValue < target) {
+        low = mid + 1;
+      } else {
+        high = mid - 1;
+      }
+    }
+
+    final leftIndex = math.max(0, high);
+    final rightIndex = math.min(candles.length - 1, low);
+
+    final leftDiff =
+        (candles[leftIndex].timestamp.millisecondsSinceEpoch - target).abs();
+    final rightDiff =
+        (candles[rightIndex].timestamp.millisecondsSinceEpoch - target).abs();
+
+    return leftDiff <= rightDiff ? candles[leftIndex] : candles[rightIndex];
   }
 }
 
@@ -325,10 +483,7 @@ class _ChartPainter extends CustomPainter {
   final Chart chart;
   final ChartTheme theme;
 
-  _ChartPainter({
-    required this.chart,
-    required this.theme,
-  });
+  _ChartPainter({required this.chart, required this.theme});
 
   @override
   void paint(Canvas canvas, Size size) {

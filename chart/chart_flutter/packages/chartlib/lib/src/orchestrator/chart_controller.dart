@@ -92,7 +92,8 @@ class ChartController {
       // For append: pan time axis left by 1 if viewing rightmost candle
       if (changeType == TimeSeriesChangeType.append) {
         final wasViewingLatest =
-            endIndex == allCandles.length - 2; // Before append, last index was length - 2
+            endIndex ==
+            allCandles.length - 2; // Before append, last index was length - 2
 
         commonScaleManager.updateTimeScaleDomain(timestamps);
 
@@ -133,7 +134,9 @@ class ChartController {
         recalculatePriceScalesFromVisibleCandles();
 
         PerformanceTracker.end(
-            'update', 'type=$changeType, prepended=$prependedCount');
+          'update',
+          'type=$changeType, prepended=$prependedCount',
+        );
         return; // Done - studies recalculated, price scale updated, render requested
       } else {
         // Reset case
@@ -147,11 +150,15 @@ class ChartController {
       final isLastCandleVisible =
           lastCandleIndex >= startIndex && lastCandleIndex <= endIndex;
 
-      print('[ChartController._handleDataChange] UPDATE - lastCandleIndex=$lastCandleIndex, visible=$isLastCandleVisible');
+      print(
+        '[ChartController._handleDataChange] UPDATE - lastCandleIndex=$lastCandleIndex, visible=$isLastCandleVisible',
+      );
 
       // Always update studies (e.g., LastPriceLineStudy needs last price even when not visible)
       paneManager.updateLastCandle(allCandles);
-      print('[ChartController._handleDataChange] UPDATE - paneManager.updateLastCandle() completed');
+      print(
+        '[ChartController._handleDataChange] UPDATE - paneManager.updateLastCandle() completed',
+      );
 
       if (isLastCandleVisible) {
         // Last candle is visible - recalculate price scale in case high/low changed
@@ -161,16 +168,22 @@ class ChartController {
         //       Currently recalculates on every update even if price is within range.
         //       Optimization: Check lastCandle.high/low against priceScale.domain, only
         //       recalculate if it exceeds bounds. Otherwise just requestRender().
-        print('[ChartController._handleDataChange] UPDATE - calling recalculatePriceScalesFromVisibleCandles()');
+        print(
+          '[ChartController._handleDataChange] UPDATE - calling recalculatePriceScalesFromVisibleCandles()',
+        );
         recalculatePriceScalesFromVisibleCandles();
         PerformanceTracker.end('update', 'type=$changeType');
       } else {
         // Last candle not visible - just render (e.g., for LastPriceLineStudy)
         // Skip price scale recalculation since visible candles haven't changed
-        print('[ChartController._handleDataChange] UPDATE - calling renderBatcher.requestRender()');
+        print(
+          '[ChartController._handleDataChange] UPDATE - calling renderBatcher.requestRender()',
+        );
         renderBatcher.requestRender();
         PerformanceTracker.end(
-            'update', 'type=$changeType (not visible, render only)');
+          'update',
+          'type=$changeType (not visible, render only)',
+        );
       }
       return;
     }
@@ -204,19 +217,24 @@ class ChartController {
     final indices = commonScaleManager.getVisibleDomainIndices();
 
     // Guard against NaN or invalid indices
-    if (indices.startIndex.isNaN || indices.endIndex.isNaN ||
-        indices.startIndex.isInfinite || indices.endIndex.isInfinite) {
+    if (indices.startIndex.isNaN ||
+        indices.endIndex.isNaN ||
+        indices.startIndex.isInfinite ||
+        indices.endIndex.isInfinite) {
       return;
     }
 
-    final startIndex = indices.startIndex.floor();
-    final endIndex = indices.endIndex.ceil();
+    final rawStartIndex = indices.startIndex.floor();
+    final rawEndIndex = indices.endIndex.ceil();
+
+    final lastIndex = allCandles.length - 1;
+    final int clampedStart = rawStartIndex.clamp(0, lastIndex);
+    final int clampedEnd = rawEndIndex.clamp(clampedStart, lastIndex);
+
+    final int endExclusive = (clampedEnd + 1).clamp(0, allCandles.length);
 
     // Get visible candles
-    final visibleCandles = allCandles.sublist(
-      startIndex,
-      (endIndex + 1).clamp(0, allCandles.length),
-    );
+    final visibleCandles = allCandles.sublist(clampedStart, endExclusive);
     if (visibleCandles.isEmpty) return;
 
     // Calculate price domain from visible candles (high/low)
@@ -240,8 +258,7 @@ class ChartController {
     // Notify panes that scales changed (time scale changed, price scale changed)
     paneManager.updateScales(true, true);
 
-    PerformanceTracker.end(
-        'recalculation', 'visible=${visibleCandles.length}');
+    PerformanceTracker.end('recalculation', 'visible=${visibleCandles.length}');
 
     // Request render (render time tracked in renderer)
     renderBatcher.requestRender();

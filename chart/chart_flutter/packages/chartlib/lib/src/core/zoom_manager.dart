@@ -20,7 +20,7 @@ import '../scale/common_scale_manager.dart';
 class ZoomManager {
   ZoomManager(
     this._scaleManager, {
-    this.minVisibleCandles = 10,
+    this.minVisibleCandles = 2,
     this.maxVisibleCandles = 2500,
   });
 
@@ -38,10 +38,7 @@ class ZoomManager {
     final visibleRange = endIndex - startIndex;
 
     // Remove floor for smooth zoom - allow fractional range
-    final newVisibleRange = math.max(
-      minVisibleCandles,
-      visibleRange / factor,
-    );
+    final newVisibleRange = math.max(minVisibleCandles, visibleRange / factor);
 
     // RIGHT-ANCHORED: endIndex stays fixed, startIndex changes
     final newStartIndex = endIndex - newVisibleRange;
@@ -59,18 +56,12 @@ class ZoomManager {
     final visibleRange = endIndex - startIndex;
 
     // Remove floor for smooth zoom - allow fractional range
-    final newVisibleRange = math.min(
-      maxVisibleCandles,
-      visibleRange * factor,
-    );
+    final newVisibleRange = math.min(maxVisibleCandles, visibleRange * factor);
 
     // RIGHT-ANCHORED: endIndex stays fixed, startIndex changes
     final newStartIndex = endIndex - newVisibleRange;
 
-    _scaleManager.updateTimeScale(
-      math.max(0, newStartIndex),
-      endIndex,
-    );
+    _scaleManager.updateTimeScale(math.max(0, newStartIndex), endIndex);
   }
 
   /// Pan horizontally (shift time axis left or right).
@@ -96,7 +87,8 @@ class ZoomManager {
 
     if (newEndIndex >= fullLength) {
       newEndIndex = (fullLength - 1).toDouble();
-      newStartIndex = newEndIndex - visibleRange; // End at last candle, maintain range
+      newStartIndex =
+          newEndIndex - visibleRange; // End at last candle, maintain range
     }
 
     // Only update if indices actually changed (avoid unnecessary updates at boundaries)

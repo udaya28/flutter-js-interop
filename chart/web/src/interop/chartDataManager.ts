@@ -118,17 +118,12 @@ export class ChartDataManager {
     payload: ChartMessage['payload'],
   ): void {
     const bridge = this.targetWindow.ChartFlutterUI;
-    if (bridge?.update) {
+    if (typeof bridge?.update === 'function') {
       try {
         bridge.update({ type, payload });
-      } catch (error) {
-        console.error('[ChartDataManager] Failed to notify Flutter:', error);
+      } catch {
+        // Swallow notification errors to avoid noisy logging in the host shell.
       }
-    } else {
-      console.warn(
-        '[ChartDataManager] Flutter UI bridge not ready for type',
-        type,
-      );
     }
   }
 }

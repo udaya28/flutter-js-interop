@@ -65,16 +65,15 @@ class SimulatorDataManager implements DataManager {
 
   @override
   Future<HistoricalBatch> loadHistorical() async {
-    print('[SimulatorDataManager.loadHistorical] Called: _historicalLoadedCount=$_historicalLoadedCount, historicalBatchSize=$historicalBatchSize');
-
     // First call: generate initial batch of historical candles
     if (_historicalLoadedCount == 0) {
-      final candles = await _simulator.generateHistoricalCandles(historicalBatchSize);
+      final candles = await _simulator.generateHistoricalCandles(
+        historicalBatchSize,
+      );
       _allCandles.addAll(candles);
       _historicalLoadedCount = candles.length;
 
       final hasMore = _historicalLoadedCount < initialHistoricalCount;
-      print('[SimulatorDataManager.loadHistorical] Initial batch: ${candles.length} candles, hasMore=$hasMore');
 
       return HistoricalBatch(candles: candles, hasMore: hasMore);
     }
@@ -82,7 +81,6 @@ class SimulatorDataManager implements DataManager {
     // Subsequent calls: generate more historical data going backwards
     if (_historicalLoadedCount >= initialHistoricalCount) {
       // No more historical data
-      print('[SimulatorDataManager.loadHistorical] No more data to load');
       return HistoricalBatch(candles: [], hasMore: false);
     }
 
@@ -91,7 +89,9 @@ class SimulatorDataManager implements DataManager {
 
     // Calculate how many candles to generate in this batch
     final remaining = initialHistoricalCount - _historicalLoadedCount;
-    final batchSize = remaining < historicalBatchSize ? remaining : historicalBatchSize;
+    final batchSize = remaining < historicalBatchSize
+        ? remaining
+        : historicalBatchSize;
 
     // Generate next batch
     final candles = await _simulator.generateHistoricalCandles(batchSize);
@@ -101,7 +101,6 @@ class SimulatorDataManager implements DataManager {
     _historicalLoadedCount += candles.length;
 
     final hasMore = _historicalLoadedCount < initialHistoricalCount;
-    print('[SimulatorDataManager.loadHistorical] Loaded batch: ${candles.length} candles, hasMore=$hasMore, total=$_historicalLoadedCount');
 
     return HistoricalBatch(candles: candles, hasMore: hasMore);
   }
@@ -109,7 +108,6 @@ class SimulatorDataManager implements DataManager {
   @override
   void onRealtimeUpdate(void Function(OHLCData candle) callback) {
     _realtimeCallback = callback;
-    print('[SimulatorDataManager.onRealtimeUpdate] Callback registered');
   }
 
   /// Start the real-time simulator ticker.
@@ -118,11 +116,9 @@ class SimulatorDataManager implements DataManager {
   /// New candles are sent to the callback registered via onRealtimeUpdate().
   void start() {
     if (_isRunning) {
-      print('[SimulatorDataManager.start] Already running');
       return;
     }
 
-    print('[SimulatorDataManager.start] Starting simulator ticker');
     _isRunning = true;
 
     _simulator.startTicker((candle) {
@@ -139,11 +135,9 @@ class SimulatorDataManager implements DataManager {
   /// Stops generating new candles.
   void stop() {
     if (!_isRunning) {
-      print('[SimulatorDataManager.stop] Not running');
       return;
     }
 
-    print('[SimulatorDataManager.stop] Stopping simulator ticker');
     _isRunning = false;
     _simulator.stopTicker();
   }
@@ -153,11 +147,9 @@ class SimulatorDataManager implements DataManager {
   /// Clears all loaded data and resets to initial state.
   /// Stops the ticker if running.
   void reset() {
-    print('[SimulatorDataManager.reset] Resetting - current _historicalLoadedCount=$_historicalLoadedCount');
     stop();
     _historicalLoadedCount = 0;
     _allCandles.clear();
-    print('[SimulatorDataManager.reset] Reset complete - new _historicalLoadedCount=$_historicalLoadedCount');
   }
 
   /// Get the total number of candles generated.
@@ -182,6 +174,5 @@ class SimulatorDataManager implements DataManager {
   void dispose() {
     stop();
     _simulator.dispose();
-    print('[SimulatorDataManager.dispose] Disposed');
   }
 }

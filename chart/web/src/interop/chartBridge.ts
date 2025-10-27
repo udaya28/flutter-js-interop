@@ -18,8 +18,8 @@ export function initializeChartBridge(
           const parsed = JSON.parse(message) as ChartMessage;
           handler(parsed);
           return;
-        } catch (error) {
-          console.warn('[ChartBridge] Failed to parse Flutter message', error);
+        } catch {
+          // Ignore malformed payloads and fall back to raw message handling below.
         }
       }
 

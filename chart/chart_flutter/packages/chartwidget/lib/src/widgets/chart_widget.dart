@@ -46,6 +46,12 @@ class ChartWidget extends StatefulWidget {
   /// indicates the pointer exited the chart area.
   final void Function(ChartHoverEvent? event)? onHover;
 
+  /// Callback fired once the chart finishes its initial asynchronous
+  /// initialization cycle. Useful for orchestration layers that need to
+  /// coordinate data flows (e.g., starting a simulator once the chart is
+  /// ready to consume realtime updates).
+  final VoidCallback? onChartInitialized;
+
   const ChartWidget({
     super.key,
     required this.dataManager,
@@ -58,6 +64,7 @@ class ChartWidget extends StatefulWidget {
     this.padding,
     this.onViewportChanged,
     this.onHover,
+    this.onChartInitialized,
   });
 
   @override
@@ -125,20 +132,10 @@ class _ChartWidgetState extends State<ChartWidget> {
   Future<void> _initializeChart(Size size) async {
     if (_isInitialized) return;
 
-    print(
-      '[ChartWidget._initializeChart] Starting chart initialization with size: ${size.width}x${size.height}',
-    );
-
     // CRITICAL: Reset dataManager state before creating new chart
     // This ensures fresh data loading when widget rebuilds (e.g., on study toggles)
     if (widget.dataManager is SampleDataManager) {
-      print('[ChartWidget._initializeChart] Resetting SampleDataManager state');
       (widget.dataManager as SampleDataManager).reset();
-    } else if (widget.dataManager is SimulatorDataManager) {
-      print(
-        '[ChartWidget._initializeChart] Resetting SimulatorDataManager state',
-      );
-      (widget.dataManager as SimulatorDataManager).reset();
     }
 
     try {
@@ -189,17 +186,13 @@ class _ChartWidgetState extends State<ChartWidget> {
           return;
         }
 
-        print('[ChartWidget.onRender] Render callback fired');
-
         // Trigger Flutter repaint; render occurs inside CustomPainter.paint
         setState(() {});
         _notifyViewportChanged();
       });
 
       // Initialize with data
-      print('[ChartWidget._initializeChart] Calling chart.initialize()');
       await chart.initialize();
-      print('[ChartWidget._initializeChart] Chart initialized successfully');
 
       setState(() {
         _chart = chart;
@@ -208,9 +201,9 @@ class _ChartWidgetState extends State<ChartWidget> {
       });
 
       _notifyViewportChanged();
-    } catch (e, stackTrace) {
-      print('[ChartWidget._initializeChart] ERROR: $e');
-      print('[ChartWidget._initializeChart] Stack trace: $stackTrace');
+
+      widget.onChartInitialized?.call();
+    } catch (e) {
       setState(() {
         _error = 'Failed to initialize chart: $e';
         _isInitialized = false;

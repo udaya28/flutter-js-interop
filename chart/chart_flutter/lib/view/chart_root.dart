@@ -18,7 +18,15 @@ class ChartRoot extends StatefulWidget {
 class _ChartRootState extends State<ChartRoot> {
   late final CandleStudy _candleStudy = CandleStudy();
   late final List<Study<dynamic>> _overlayStudies = <Study<dynamic>>[
-    SMAStudy(period: 20),
+    SMAStudy(period: 20, color: '#ff9800'),
+    EMAStudy(period: 12, color: '#4caf50'),
+    BollingerBandsStudy(
+      period: 20,
+      multiplier: 2,
+      fillColor: '#2196f3',
+      borderColor: '#2196f3',
+    ),
+    LastPriceLineStudy(),
   ];
   late final List<SubPaneConfig> _subPanes = <SubPaneConfig>[
     SubPaneConfig(
@@ -26,6 +34,7 @@ class _ChartRootState extends State<ChartRoot> {
       primaryStudy: VolumeStudy(),
       heightPercent: 0.25,
     ),
+    SubPaneConfig(id: 'rsi', primaryStudy: RSIStudy(), heightPercent: 0.25),
   ];
 
   @override
@@ -65,6 +74,7 @@ class _ChartRootState extends State<ChartRoot> {
                 candle: event?.candle,
               );
             },
+            onChartInitialized: widget.interop.onChartInitialized,
           ),
         );
       },

@@ -16,7 +16,7 @@ class ChartViewModel {
     required this.revision,
   });
 
-  final InteropDataManager dataManager;
+  final DataManager dataManager;
   final ChartTheme theme;
   final ChartViewport? viewport;
   final int revision;
@@ -41,7 +41,7 @@ class ChartInterop {
   final ChartBridge _bridge;
   final ValueNotifier<ChartViewModel?> viewModel = ValueNotifier(null);
 
-  InteropDataManager? _dataManager;
+  InteropDataManager? _interopDataManager;
   ChartTheme _currentTheme = themes['dark'] ?? darkTheme;
   ChartViewport? _currentViewport;
   int _dataRevision = 0;
@@ -64,7 +64,6 @@ class ChartInterop {
 
   void bootstrap() {
     if (!_enableJsInterop) {
-      _log('[ChartInterop] bootstrap skipped (JS interop disabled)');
       return;
     }
     _bridge.sendToVue('CHART_READY', {'ready': true});
@@ -72,7 +71,6 @@ class ChartInterop {
 
   void _handleInitChart(JSAny? payload) {
     if (payload == null) {
-      _log('[ChartInterop] INIT_CHART received without payload');
       return;
     }
 
@@ -81,41 +79,34 @@ class ChartInterop {
       final candles = _convertCandles(initPayload.series);
       _currentTheme = _resolveTheme(initPayload.theme);
       _currentViewport = _parseViewport(initPayload.viewport);
-      _dataManager = InteropDataManager(candles);
+      _interopDataManager = InteropDataManager(candles);
       _publishViewModel(resetRevision: true);
-      _log(
-        '[ChartInterop] INIT_CHART processed with ${candles.length} candles',
-      );
     } catch (error) {
-      _log('[ChartInterop] Failed to parse INIT_CHART payload: $error');
+      // Silently ignore malformed payloads.
     }
   }
 
   void _handleSetSeries(JSAny? payload) {
     if (payload == null) {
-      _log('[ChartInterop] SET_SERIES received without payload');
       return;
     }
 
     try {
       final seriesPayload = payload as ChartSeriesPayload;
       final candles = _convertCandles(seriesPayload.series);
-      _dataManager = InteropDataManager(candles);
+      _interopDataManager = InteropDataManager(candles);
       _publishViewModel(resetRevision: true);
-      _log('[ChartInterop] SET_SERIES applied (${candles.length} candles)');
     } catch (error) {
-      _log('[ChartInterop] Failed to parse SET_SERIES payload: $error');
+      // Silently ignore malformed payloads.
     }
   }
 
   void _handlePatchSeries(JSAny? payload) {
     if (payload == null) {
-      _log('[ChartInterop] PATCH_SERIES received without payload');
       return;
     }
 
-    if (_dataManager == null) {
-      _log('[ChartInterop] PATCH_SERIES ignored - data manager not ready');
+    if (_interopDataManager == null) {
       return;
     }
 
@@ -123,20 +114,17 @@ class ChartInterop {
       final patchPayload = payload as ChartPatchPayload;
       final upserts = _convertCandles(patchPayload.upserts);
       final removals = _convertRemovalTimestamps(patchPayload.removals);
-      final requiresReload = _dataManager!.applyPatch(
+      final requiresReload = _interopDataManager!.applyPatch(
         upserts: upserts,
         removals: removals,
       );
       if (requiresReload) {
-        final snapshot = _dataManager!.snapshot();
-        _dataManager = InteropDataManager(snapshot);
+        final snapshot = _interopDataManager!.snapshot();
+        _interopDataManager = InteropDataManager(snapshot);
         _publishViewModel(bumpRevision: true);
       }
-      _log(
-        '[ChartInterop] PATCH_SERIES processed (upserts=${upserts.length}, removals=${removals.length})',
-      );
     } catch (error) {
-      _log('[ChartInterop] Failed to process PATCH_SERIES payload: $error');
+      // Silently ignore malformed payloads.
     }
   }
 
@@ -153,26 +141,26 @@ class ChartInterop {
       }
       _currentTheme = nextTheme;
       _publishViewModel();
-      _log('[ChartInterop] Theme switched to ${nextTheme.name}');
     } catch (error) {
-      _log('[ChartInterop] Failed to parse SET_THEME payload: $error');
+      // Silently ignore malformed payloads.
     }
+  }
+
+  void onChartInitialized() {
+    // Retained for compatibility with ChartWidget's callback without additional side-effects.
   }
 
   void _publishViewModel({
     bool bumpRevision = false,
     bool resetRevision = false,
   }) {
-    final manager = _dataManager;
+    final manager = _interopDataManager;
     if (manager == null) {
+      viewModel.value = null;
       return;
     }
 
-    if (resetRevision) {
-      _dataRevision = 0;
-    }
-
-    if (bumpRevision) {
+    if (resetRevision || bumpRevision) {
       _dataRevision += 1;
     }
 
@@ -306,14 +294,8 @@ class ChartInterop {
         ),
       );
     } catch (error) {
-      _log('[ChartInterop] Failed to parse viewport payload: $error');
       return null;
     }
-  }
-
-  void _log(String message) {
-    // ignore: avoid_print
-    print(message);
   }
 
   Map<String, dynamic> _serializeCandle(OHLCData candle) {

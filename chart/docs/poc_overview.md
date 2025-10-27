@@ -27,15 +27,15 @@ Welcome! This document explains the changes introduced in the current proof of c
 
 ## Directory Cheat Sheet
 
-| Path | Purpose |
-| --- | --- |
-| `chart/web/src/pages/Chart.vue` | Vue route that mounts the Flutter iframe, exposes simulator controls, and owns the interop lifecycle. |
-| `chart/web/src/interop/` | TypeScript bridge pieces (`chartDataManager`, `chartSimulator`, `chartBridge`, DTO types). |
-| `chart/web/src/demo/dataSimulator.ts` | Deterministic OHLC generator reused by both demo seed data and the realtime simulator. |
-| `chart/chart_flutter/lib/interop/` | Flutter JS-interop layer (`ChartInterop`, bridge helpers, DTO bindings). |
-| `chart/chart_flutter/lib/view/` | Flutter UI hierarchy (`ChartRoot`, widgets, ValueListenable wiring). |
-| `chart/docs/interop_contract.md` | Formal JSON contract for every interop message. |
-| `chart/build-flutter.sh` | Convenience script that builds Flutter Web into `chart/web/public/flutter/`. |
+| Path                                  | Purpose                                                                                               |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `chart/web/src/pages/Chart.vue`       | Vue route that mounts the Flutter iframe, exposes simulator controls, and owns the interop lifecycle. |
+| `chart/web/src/interop/`              | TypeScript bridge pieces (`chartDataManager`, `chartSimulator`, `chartBridge`, DTO types).            |
+| `chart/web/src/demo/dataSimulator.ts` | Deterministic OHLC generator reused by both demo seed data and the realtime simulator.                |
+| `chart/chart_flutter/lib/interop/`    | Flutter JS-interop layer (`ChartInterop`, bridge helpers, DTO bindings).                              |
+| `chart/chart_flutter/lib/view/`       | Flutter UI hierarchy (`ChartRoot`, widgets, ValueListenable wiring).                                  |
+| `chart/docs/interop_contract.md`      | Formal JSON contract for every interop message.                                                       |
+| `chart/build-flutter.sh`              | Convenience script that builds Flutter Web into `chart/web/public/flutter/`.                          |
 
 ---
 
@@ -93,23 +93,28 @@ Every timestamp is milliseconds since epoch. Candles use UTC to avoid timezone d
 ## Running the POC Locally
 
 1. **Install dependencies**
+
    ```bash
    cd chart/web
    pnpm install
    ```
 
 2. **Build the Flutter artefacts** (any time Dart code changes)
+
    ```bash
    cd ../
    ./build-flutter.sh
    ```
+
    This drops the web build into `chart/web/public/flutter/`.
 
 3. **Start the Vue dev server**
+
    ```bash
    cd web
    pnpm dev
    ```
+
    Visit `http://localhost:5173/#/chart` to load the POC.
 
 4. **Optional: rebuild Flutter automatically** – use `flutter run -d web-server` or a custom watch script if you need rapid iteration, then copy the build output into `public/flutter/`.
@@ -143,14 +148,17 @@ Every timestamp is milliseconds since epoch. Candles use UTC to avoid timezone d
 ## Extending the POC
 
 - **Adding a new message from Vue → Flutter**
+
   1. Define the payload type in `chartContracts.ts` and `chart_js_bindings.dart`.
   2. Send it via `notifyFlutter` (Vue) and handle it in `ChartInterop._setupHandlers` (Flutter).
 
 - **Surfacing a new event from Flutter → Vue**
+
   1. Emit it inside Flutter using `_bridge.sendToVue('EVENT_NAME', payload)`.
   2. Handle it in `Chart.vue` inside the `initializeChartBridge` callback and route it to a store or component.
 
 - **Feeding real market data**
+
   - Swap `ChartSimulator` calls with your transport (WebSocket, HTTP polling) and continue using `ChartDataManager.setSeries` / `.patchSeries` to keep Flutter in sync.
 
 - **Sharing state with other Vue pages**

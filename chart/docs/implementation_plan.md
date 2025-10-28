@@ -55,7 +55,7 @@
 ### Step 0.6 – Connect Data to Chart Widgets ✅
 
 - Replaced the placeholder app with `ChartApp` + `ChartRoot`, wiring a `ValueListenableBuilder` to the interop view model and rendering `ChartWidget` (candles + SMA overlay + volume sub-pane).
-- Added `InteropDataManager` so JS payloads become `OHLCData` batches consumed by `DataManager.loadHistorical` and realtime callbacks; ensured patches trigger chart updates and full reloads when removals occur.
+- Added `ChartController` so JS payloads become `OHLCData` batches consumed by `DataManager.loadHistorical` and realtime callbacks; ensured patches trigger chart updates and full reloads when removals occur.
 - Promoted the interop layer to publish theme + viewport state, injecting the selected `ChartTheme` into Flutter so visuals match Vue configuration.
 - DoD: loading the iframe now displays the live chart populated with Vue demo candles immediately after `INIT_CHART` fires.
 

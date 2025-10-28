@@ -5,11 +5,7 @@ import {
   type ChartBridgeWindow,
 } from '@/interop/chartDataManager';
 import { initializeChartBridge } from '@/interop/chartBridge';
-import type {
-  CandleDTO,
-  ChartMessage,
-  ChartMessageType,
-} from '@/interop/chartContracts';
+import type { CandleDTO } from '@/interop/chartContracts';
 import { generateDemoCandles, Volatility } from '@/demo/dataSimulator';
 import {
   ChartSimulator,
@@ -163,28 +159,6 @@ function handleSimulatorState(state: ChartSimulatorState | null) {
   }
 }
 
-function sendToFlutter(
-  target: ChartBridgeWindow,
-  type: ChartMessageType,
-  payload: ChartMessage['payload'],
-) {
-  const update = target.ChartFlutterUI?.update;
-  if (typeof update === 'function') {
-    update({ type, payload });
-  }
-}
-
-function notifyFlutter(
-  type: ChartMessageType,
-  payload: ChartMessage['payload'],
-) {
-  const target = targetWindow.value;
-  if (!target) {
-    return;
-  }
-  sendToFlutter(target, type, payload);
-}
-
 async function applySimulatorConfig(autoStartOverride?: boolean) {
   const instance = simulatorRef.value;
   if (!instance) {
@@ -217,31 +191,8 @@ function disableSimulator() {
 
   const dataManager = dataManagerRef.value;
   if (dataManager && demoSeries.value.length > 0) {
-    dataManager.setSeries({ series: demoSeries.value });
+    dataManager.setHistoricalData({ series: demoSeries.value });
   }
-}
-
-function waitForFlutterReady(
-  target: ChartBridgeWindow,
-  onReady: () => void,
-  intervalMs = 250,
-  timeoutMs = 15_000,
-): () => void {
-  const start = Date.now();
-  const timer = window.setInterval(() => {
-    const update = target.ChartFlutterUI?.update;
-    if (typeof update === 'function') {
-      window.clearInterval(timer);
-      onReady();
-      return;
-    }
-
-    if (Date.now() - start > timeoutMs) {
-      window.clearInterval(timer);
-    }
-  }, intervalMs);
-
-  return () => window.clearInterval(timer);
 }
 
 onMounted(() => {
@@ -298,37 +249,8 @@ onMounted(() => {
       cleanupTasks.push(bridgeDisposer);
 
       if (candles.length > 0) {
-        dataManager.setSeries({ series: candles }, false);
+        dataManager.setHistoricalData({ series: candles }, false);
       }
-
-      const stopPolling = waitForFlutterReady(iframeWindow, () => {
-        if (candles.length === 0) {
-          return;
-        }
-
-        simulatorStatus.chartReady = true;
-
-        const firstCandle = candles[0] ?? null;
-        const lastCandle = candles[candles.length - 1] ?? firstCandle;
-        if (!firstCandle || !lastCandle) {
-          return;
-        }
-
-        const viewport = {
-          startTime: firstCandle.time,
-          endTime: lastCandle.time,
-        };
-
-        notifyFlutter('INIT_CHART', {
-          theme: 'dark',
-          series: candles,
-          viewport,
-        });
-
-        dataManager.setSeries({ series: candles });
-      });
-
-      cleanupTasks.push(stopPolling);
     } catch {
       // Swallow initialization failures to keep UI responsive.
     } finally {

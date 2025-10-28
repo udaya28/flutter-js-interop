@@ -10,7 +10,7 @@ Welcome! This document explains the changes introduced in the current proof of c
 - All candle data is owned by JavaScript. Vue keeps a single candle array that lives in the iframe realm so Flutter can read it without copies.
 - A TypeScript `ChartSimulator` runs entirely on the JS side to generate live ticks, keeping Flutter focused on rendering.
 - Messages travel over a tiny bridge (`window.ChartFlutterUI.update` → Flutter, `window.ChartBridge.receiveFromFlutter` → Vue) with a documented DTO contract.
-- Flutter converts the shared JS candle array into `chartlib` data structures through `InteropDataManager` and redraws the chart.
+- Flutter converts the shared JS candle array into `chartlib` data structures through `ChartController` and redraws the chart.
 
 ---
 
@@ -20,7 +20,7 @@ Welcome! This document explains the changes introduced in the current proof of c
 2. **Realtime simulator in TypeScript** – Implemented `chart/web/src/interop/chartSimulator.ts` plus UI controls in `Chart.vue`. This replaces Flutter-side simulators and keeps interop messages identical to production feeds.
 3. **Bridge bootstrap & handshake** – `Chart.vue` now mounts the iframe, installs `ChartBridge`, waits for `ChartFlutterUI.update`, and only then publishes `INIT_CHART`, eliminating race conditions seen in earlier experiments.
 4. **Bidirectional events** – `chart/chart_flutter/lib/interop/chart_interop.dart` gained handlers for incoming messages and emits `RANGE_SELECTED` / `CANDLE_HOVERED` back to Vue through the bridge.
-5. **Shared chart packages wired up** – Flutter renders the real `chartwidget` stack (candles, studies, zoom/pan) using the JS-managed `InteropDataManager`, giving parity with the previous standalone POC.
+5. **Shared chart packages wired up** – Flutter renders the real `chartwidget` stack (candles, studies, zoom/pan) using the JS-managed `ChartController`, giving parity with the previous standalone POC.
 6. **Docs & contracts** – Message schemas live in `chart/docs/interop_contract.md`, and this overview ties the moving pieces together for new contributors.
 
 ---
@@ -70,7 +70,7 @@ Welcome! This document explains the changes introduced in the current proof of c
 ### 4. Flutter ingestion & rendering
 
 - `ChartInterop` listens for `INIT_CHART`, `SET_SERIES`, `PATCH_SERIES`, and `SET_THEME`.
-- Incoming JS DTOs are converted into `OHLCData` via `InteropDataManager`, which feeds the shared `DataManager` used by `chartwidget`.
+- Incoming JS DTOs are converted into `OHLCData` via `ChartController`, which feeds the shared `DataManager` used by `chartwidget`.
 - A `ValueNotifier` (`viewModel`) carries the latest theme + data pointer. `ChartRoot` binds this to the actual widget tree.
 - When Flutter needs to send information back (viewport changes, hover updates) it calls `_bridge.sendToVue`, which serializes the payload and invokes `window.ChartBridge.receiveFromFlutter` inside the iframe.
 - Vue currently logs these messages; wiring them into stores/UI is trivial because the data already arrives in TypeScript.
@@ -140,7 +140,7 @@ Every timestamp is milliseconds since epoch. Candles use UTC to avoid timezone d
 - `chart/chart_flutter/lib/view/chart_root.dart`
   - Listens to the interop view model and rebuilds the chart when the revision increments.
   - Forwards pointer interactions (hover, zoom) back into the interop layer.
-- `InteropDataManager` (in `lib/data/interop_data_manager.dart`)
+- `ChartController` (in `lib/data/chart_controller.dart`)
   - Bridges the JS-managed candles with the `chartlib` `DataManager`, handling patches and full reloads.
 
 ---

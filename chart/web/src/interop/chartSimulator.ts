@@ -120,7 +120,7 @@ export class ChartSimulator {
     );
 
     const historical = await this.buildHistoricalSeries(normalized, durationMs);
-    this.dataManager.setSeries({ series: historical });
+    this.dataManager.setHistoricalData({ series: historical });
 
     const lastCandle = historical[historical.length - 1] ?? null;
     this.currentPrice = lastCandle?.close ?? normalized.initialPrice;
@@ -155,7 +155,7 @@ export class ChartSimulator {
 
     if (!this.currentCandle) {
       this.currentCandle = this.createNextCandle();
-      this.pushCandleSnapshot(this.currentCandle);
+      this.publishRealTimeTick(this.currentCandle);
     }
 
     const intervalMs = Math.max(
@@ -211,7 +211,7 @@ export class ChartSimulator {
 
     if (!this.currentCandle) {
       this.currentCandle = this.createNextCandle();
-      this.pushCandleSnapshot(this.currentCandle);
+      this.publishRealTimeTick(this.currentCandle);
     }
 
     const params = this.resolveVolatilityParams(
@@ -238,7 +238,7 @@ export class ChartSimulator {
     candle.low = Math.min(candle.low, nextPrice);
     candle.volume = (candle.volume ?? 0) + this.randomVolumeIncrement();
 
-    this.pushCandleSnapshot(candle);
+    this.publishRealTimeTick(candle);
 
     this.ticksInCurrentCandle += 1;
     if (this.ticksInCurrentCandle < this.ticksPerCandle) {
@@ -247,7 +247,7 @@ export class ChartSimulator {
 
     this.ticksInCurrentCandle = 0;
     this.currentCandle = this.createNextCandle();
-    this.pushCandleSnapshot(this.currentCandle);
+    this.publishRealTimeTick(this.currentCandle);
   }
 
   private stopTicker(): void {
@@ -272,11 +272,8 @@ export class ChartSimulator {
     };
   }
 
-  private pushCandleSnapshot(candle: CandleDTO): void {
-    this.dataManager.patchSeries({
-      upserts: [{ ...candle }],
-      removals: [],
-    });
+  private publishRealTimeTick(candle: CandleDTO): void {
+    this.dataManager.pushRealtime({ ...candle });
   }
 
   private resolveDurationMs(duration: SimulatorDuration): number {

@@ -1,140 +1,109 @@
 import type {
   CandleDTO,
   ChartMessage,
-  ChartMessageType,
-  ChartPatchPayload,
   ChartSeriesPayload,
 } from './chartContracts';
 
 export type ChartBridgeWindow = (Window & typeof globalThis) & {
-  ChartFlutterUI?: {
-    update: ((message: ChartMessage) => void) | null;
-  };
   ChartDataManager?: ChartDataManager;
   ChartBridge?: {
     receiveFromFlutter: (message: ChartMessage) => void;
   };
 };
 
+type HistoricalListener = (candles: CandleDTO[]) => void;
+type RealtimeListener = (candle: CandleDTO) => void;
+
 /**
- * Maintains chart candle series inside the iframe realm and notifies Flutter when data changes.
- * Mirrors the todo POC pattern but adapted for chart-specific payloads.
+ * Maintains chart candle series and exposes a minimal DataManager-style
+ * contract for Flutter: `loadHistorical` and `onRealtimeUpdate`.
  */
 export class ChartDataManager {
   private readonly targetWindow: ChartBridgeWindow;
-  private readonly series: CandleDTO[];
-  private readonly candlesByTime: Map<number, CandleDTO>;
+  private candles: CandleDTO[];
+  private historicalListener: HistoricalListener | null = null;
+  private realtimeListener: RealtimeListener | null = null;
 
   constructor(targetWindow?: ChartBridgeWindow) {
     this.targetWindow = (targetWindow || window) as ChartBridgeWindow;
-
-    // Backing array must be created using the iframe window so Flutter receives a JSArray from the same realm.
-    this.series = new (this.targetWindow
-      .Array as ArrayConstructor)() as CandleDTO[];
-    this.candlesByTime = new Map<number, CandleDTO>();
+    this.candles = this.createRealmArray();
   }
 
   /**
-   * Returns the live candle array (same instance shared with Flutter side).
+   * Flutter registers a callback to receive the latest historical snapshot.
+   * The callback is invoked immediately with the current dataset if available
+   * and again whenever Vue replaces the underlying candle series.
    */
-  getSeries(): CandleDTO[] {
-    return this.series;
+  loadHistorical(listener: HistoricalListener): void {
+    this.historicalListener = listener;
+    if (this.candles.length > 0) {
+      listener(this.cloneCandles(this.candles));
+    }
   }
 
   /**
-   * Replace entire series and notify Flutter with SET_SERIES payload.
+   * Flutter registers a callback for realtime updates. Vue triggers the
+   * callback whenever simulator ticks push a new/updated candle.
    */
-  setSeries(payload: ChartSeriesPayload, notify = true): void {
-    this.series.length = 0;
-    this.candlesByTime.clear();
+  onRealtimeUpdate(listener: RealtimeListener): void {
+    this.realtimeListener = listener;
+  }
 
+  /** Vue Helpers **/
+
+  setHistoricalData(payload: ChartSeriesPayload): void {
     const sorted = [...payload.series].sort((a, b) => a.time - b.time);
+    const next = this.createRealmArray();
     sorted.forEach(candle => {
-      const clone = { ...candle };
-      this.candlesByTime.set(clone.time, clone);
-      this.series.push(clone);
+      next.push({ ...candle });
     });
-
-    if (notify) {
-      this.notifyFlutter('SET_SERIES', { series: this.series });
-    }
+    this.candles = next;
+    this.notifyHistorical();
   }
 
-  /**
-   * Apply upserts/removals then emit PATCH_SERIES.
-   */
-  patchSeries(payload: ChartPatchPayload): void {
-    if (payload.removals?.length) {
-      const removals = new Set(payload.removals);
-      // Remove from map first
-      removals.forEach(timestamp => {
-        this.candlesByTime.delete(timestamp);
-      });
-      // Filter backing array in-place to maintain the same instance
-      let writeIndex = 0;
-      for (let readIndex = 0; readIndex < this.series.length; readIndex++) {
-        const candle = this.series[readIndex];
-        if (!candle || removals.has(candle.time)) {
-          continue;
-        }
-        this.series[writeIndex++] = candle;
-      }
-      this.series.length = writeIndex;
+  pushRealtime(candle: CandleDTO): void {
+    // const clone = { ...candle };
+    // const index = this.candles.findIndex(item => item.time === clone.time);
+    // if (index >= 0) {
+    //   this.candles[index] = clone;
+    // } else {
+    //   this.candles.push(clone);
+    //   this.candles.sort((a, b) => a.time - b.time);
+    // }
+
+    if (this.realtimeListener) {
+      this.realtimeListener({ ...candle });
     }
-
-    if (payload.upserts.length) {
-      payload.upserts.forEach(upsert => {
-        const clone = { ...upsert };
-        this.candlesByTime.set(clone.time, clone);
-      });
-    }
-
-    // Reconcile backing array ordering after removals/upserts
-    const ordered = Array.from(this.candlesByTime.values()).sort(
-      (a, b) => a.time - b.time,
-    );
-    this.series.length = 0;
-    ordered.forEach(candle => {
-      this.series.push(candle);
-    });
-
-    this.notifyFlutter('PATCH_SERIES', {
-      upserts: payload.upserts,
-      removals: payload.removals,
-    });
   }
 
   clear(): void {
-    this.series.length = 0;
-    this.candlesByTime.clear();
-    this.notifyFlutter('SET_SERIES', { series: this.series });
+    this.candles = this.createRealmArray();
+    this.notifyHistorical();
   }
 
-  /**
-   * Helper to emit ChartMessage into the iframe bridge if Flutter registered a listener.
-   */
-  private notifyFlutter(
-    type: ChartMessageType,
-    payload: ChartMessage['payload'],
-  ): void {
-    const bridge = this.targetWindow.ChartFlutterUI;
-    if (typeof bridge?.update === 'function') {
-      try {
-        bridge.update({ type, payload });
-      } catch {
-        // Swallow notification errors to avoid noisy logging in the host shell.
-      }
+  private notifyHistorical(): void {
+    if (!this.historicalListener) {
+      return;
     }
+    this.historicalListener(this.cloneCandles(this.candles));
+  }
+
+  private createRealmArray(): CandleDTO[] {
+    return new (this.targetWindow.Array as ArrayConstructor)() as CandleDTO[];
+  }
+
+  private cloneCandles(list: CandleDTO[]): CandleDTO[] {
+    const clone = this.createRealmArray();
+    list.forEach(candle => {
+      clone.push({ ...candle });
+    });
+    return clone;
   }
 }
 
 export function ensureChartBridge(
   targetWindow: ChartBridgeWindow,
 ): ChartDataManager {
-  if (!targetWindow.ChartFlutterUI) {
-    targetWindow.ChartFlutterUI = { update: null };
-  }
-
   if (!targetWindow.ChartDataManager) {
     targetWindow.ChartDataManager = new ChartDataManager(targetWindow);
   }
@@ -144,9 +113,6 @@ export function ensureChartBridge(
 
 declare global {
   interface Window {
-    ChartFlutterUI?: {
-      update: ((message: ChartMessage) => void) | null;
-    };
     ChartDataManager?: ChartDataManager;
     ChartBridge?: {
       receiveFromFlutter: (message: ChartMessage) => void;

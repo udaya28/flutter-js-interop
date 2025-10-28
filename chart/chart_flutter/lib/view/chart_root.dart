@@ -66,14 +66,6 @@ class _ChartRootState extends State<ChartRoot> {
             overlayStudies: _overlayStudies,
             subPanes: _subPanes,
             theme: chartTheme,
-            onViewportChanged: widget.interop.sendViewportRange,
-            onHover: (event) {
-              widget.interop.sendHoverUpdate(
-                time: event?.time,
-                price: event?.price,
-                candle: event?.candle,
-              );
-            },
             onChartInitialized: widget.interop.onChartInitialized,
           ),
         );

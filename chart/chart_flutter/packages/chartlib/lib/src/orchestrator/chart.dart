@@ -67,8 +67,8 @@ class Chart {
     required this.dataManager,
     required Compositor compositor,
   }) {
-    print('[Chart] Constructor started');
-    print('[Chart] chartSize: ${chartSize.width}x${chartSize.height}, padding: L${chartPadding.left} R${chartPadding.right} T${chartPadding.top} B${chartPadding.bottom}');
+    // print('[Chart] Constructor started');
+    // print('[Chart] chartSize: ${chartSize.width}x${chartSize.height}, padding: L${chartPadding.left} R${chartPadding.right} T${chartPadding.top} B${chartPadding.bottom}');
 
     // 1. Create shared infrastructure - CommonScaleManager
     final canvasWidth =
@@ -76,7 +76,7 @@ class Chart {
     final canvasHeight =
         chartSize.height - chartPadding.top - chartPadding.bottom;
 
-    print('[Chart] canvasWidth=$canvasWidth, canvasHeight=$canvasHeight');
+    // print('[Chart] canvasWidth=$canvasWidth, canvasHeight=$canvasHeight');
 
     final commonScaleManager = CommonScaleManager(
       timeData: [], // Empty - data loaded in initialize()
@@ -88,15 +88,11 @@ class Chart {
       initialVisibleEnd: 0,
     );
 
-    print('[Chart] CommonScaleManager created');
+    // print('[Chart] CommonScaleManager created');
 
     // 2. Create shared context (renderer-agnostic)
     context = ChartContext(
-      config: ChartConfig(
-        size: chartSize,
-        padding: chartPadding,
-        theme: theme,
-      ),
+      config: ChartConfig(size: chartSize, padding: chartPadding, theme: theme),
       scales: commonScaleManager,
     );
 
@@ -148,17 +144,19 @@ class Chart {
   /// Must be called after construction, before rendering.
   /// Loads initial historical data and sets up realtime updates.
   Future<void> initialize() async {
-    print('[Chart.initialize] Starting initialization');
+    // print('[Chart.initialize] Starting initialization');
 
     // Wait for compositor initialization (PixiJS is async)
     await multiPaneRenderer.waitForInit();
-    print('[Chart.initialize] Compositor ready');
+    // print('[Chart.initialize] Compositor ready');
 
     // Load initial batch of historical data
     final batch = await dataManager.loadHistorical();
     hasMoreHistorical = batch.hasMore;
 
-    print('[Chart.initialize] Loaded ${batch.candles.length} candles, hasMore=${batch.hasMore}');
+    // print(
+    //   '[Chart.initialize] Loaded ${batch.candles.length} candles, hasMore=${batch.hasMore}',
+    // );
 
     // Load into chart
     chartController.loadInitialData(batch.candles);
@@ -166,22 +164,29 @@ class Chart {
     // Set visible range to show last ~120 candles (or all if fewer)
     final totalCandles = batch.candles.length;
 
-    print('[Chart.initialize] totalCandles=$totalCandles');
+    // print('[Chart.initialize] totalCandles=$totalCandles');
 
     // Only set up scales if we have data
     if (totalCandles > 0) {
       const defaultVisibleCandles = 120;
-      final startIndex =
-          (totalCandles - defaultVisibleCandles).clamp(0, totalCandles - 1);
+      final startIndex = (totalCandles - defaultVisibleCandles).clamp(
+        0,
+        totalCandles - 1,
+      );
       final endIndex = totalCandles - 1;
 
-      print('[Chart.initialize] Setting visible range: startIndex=$startIndex, endIndex=$endIndex');
+      // print(
+      //   '[Chart.initialize] Setting visible range: startIndex=$startIndex, endIndex=$endIndex',
+      // );
 
-      context.scales.updateTimeScale(startIndex.toDouble(), endIndex.toDouble());
+      context.scales.updateTimeScale(
+        startIndex.toDouble(),
+        endIndex.toDouble(),
+      );
       chartController.recalculatePriceScalesFromVisibleCandles();
     }
 
-    print('[Chart.initialize] Initialization complete');
+    // print('[Chart.initialize] Initialization complete');
   }
 
   /// Handle real-time update (called by DataManager).
@@ -316,14 +321,16 @@ class Chart {
     final indices = context.scales.getVisibleDomainIndices();
 
     // Guard against NaN or invalid indices
-    if (indices.startIndex.isNaN || indices.endIndex.isNaN ||
-        indices.startIndex.isInfinite || indices.endIndex.isInfinite) {
+    if (indices.startIndex.isNaN ||
+        indices.endIndex.isNaN ||
+        indices.startIndex.isInfinite ||
+        indices.endIndex.isInfinite) {
       return (startIndex: 0, endIndex: 0);
     }
 
     return (
       startIndex: indices.startIndex.floor(),
-      endIndex: indices.endIndex.ceil()
+      endIndex: indices.endIndex.ceil(),
     );
   }
 

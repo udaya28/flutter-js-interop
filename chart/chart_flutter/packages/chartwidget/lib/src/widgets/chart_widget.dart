@@ -480,7 +480,7 @@ class _ChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    print('[_ChartPainter.paint] REPAINT STARTED');
+    // print('[_ChartPainter.paint] REPAINT STARTED');
     // Create Flutter compositor
     final compositor = FlutterCompositor(canvas, size, theme);
 
@@ -491,7 +491,7 @@ class _ChartPainter extends CustomPainter {
 
     // Render the chart
     chart.multiPaneRenderer.render();
-    print('[_ChartPainter.paint] REPAINT COMPLETED');
+    // print('[_ChartPainter.paint] REPAINT COMPLETED');
   }
 
   @override

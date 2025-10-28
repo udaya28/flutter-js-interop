@@ -33,11 +33,11 @@ class RenderBatcher {
   void requestRender() {
     // Already have a pending frame, no need to schedule another
     if (_isPending) {
-      print('[RenderBatcher.requestRender] BATCHED - render already pending');
+      // print('[RenderBatcher.requestRender] BATCHED - render already pending');
       return;
     }
 
-    print('[RenderBatcher.requestRender] SCHEDULED - new render request');
+    // print('[RenderBatcher.requestRender] SCHEDULED - new render request');
     _isPending = true;
 
     // Schedule render on next microtask (immediate in Flutter)
@@ -45,7 +45,7 @@ class RenderBatcher {
     // SchedulerBinding.instance.scheduleFrameCallback((_) { ... })
     Future.microtask(() {
       _isPending = false;
-      print('[RenderBatcher.requestRender] EXECUTING - calling onRender callback');
+      // print('[RenderBatcher.requestRender] EXECUTING - calling onRender callback');
 
       // Execute render callback
       _onRender?.call();

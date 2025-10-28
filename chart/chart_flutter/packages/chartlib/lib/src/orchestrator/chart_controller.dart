@@ -71,7 +71,7 @@ class ChartController {
   /// Handle data change from TimeSeriesStore.
   /// Coordinates: data → panes → scales → render.
   void _handleDataChange(TimeSeriesChangeType changeType) {
-    print('[ChartController._handleDataChange] changeType=$changeType');
+    // print('[ChartController._handleDataChange] changeType=$changeType');
     PerformanceTracker.start('update');
     final allCandles = timeSeriesStore.getAll();
 
@@ -150,15 +150,15 @@ class ChartController {
       final isLastCandleVisible =
           lastCandleIndex >= startIndex && lastCandleIndex <= endIndex;
 
-      print(
-        '[ChartController._handleDataChange] UPDATE - lastCandleIndex=$lastCandleIndex, visible=$isLastCandleVisible',
-      );
+      // print(
+      //   '[ChartController._handleDataChange] UPDATE - lastCandleIndex=$lastCandleIndex, visible=$isLastCandleVisible',
+      // );
 
       // Always update studies (e.g., LastPriceLineStudy needs last price even when not visible)
       paneManager.updateLastCandle(allCandles);
-      print(
-        '[ChartController._handleDataChange] UPDATE - paneManager.updateLastCandle() completed',
-      );
+      // print(
+      //   '[ChartController._handleDataChange] UPDATE - paneManager.updateLastCandle() completed',
+      // );
 
       if (isLastCandleVisible) {
         // Last candle is visible - recalculate price scale in case high/low changed
@@ -168,17 +168,17 @@ class ChartController {
         //       Currently recalculates on every update even if price is within range.
         //       Optimization: Check lastCandle.high/low against priceScale.domain, only
         //       recalculate if it exceeds bounds. Otherwise just requestRender().
-        print(
-          '[ChartController._handleDataChange] UPDATE - calling recalculatePriceScalesFromVisibleCandles()',
-        );
+        // print(
+        //   '[ChartController._handleDataChange] UPDATE - calling recalculatePriceScalesFromVisibleCandles()',
+        // );
         recalculatePriceScalesFromVisibleCandles();
         PerformanceTracker.end('update', 'type=$changeType');
       } else {
         // Last candle not visible - just render (e.g., for LastPriceLineStudy)
         // Skip price scale recalculation since visible candles haven't changed
-        print(
-          '[ChartController._handleDataChange] UPDATE - calling renderBatcher.requestRender()',
-        );
+        // print(
+        //   '[ChartController._handleDataChange] UPDATE - calling renderBatcher.requestRender()',
+        // );
         renderBatcher.requestRender();
         PerformanceTracker.end(
           'update',

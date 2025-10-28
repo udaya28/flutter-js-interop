@@ -21,23 +21,23 @@ class OrdinalTimeScale implements Scale<DateTime> {
     required double rangeMax,
     double startIndex = 0,
     double? endIndex,
-  })  : _fullDomain = fullDomain,
-        _rangeMin = rangeMin,
-        _rangeMax = rangeMax,
-        _startIndex = startIndex,
-        _endIndex = endIndex ?? (fullDomain.length - 1).toDouble(),
-        _step = 0 {
-    print('[OrdinalTimeScale] Constructor: fullDomain.length=${fullDomain.length}, rangeMin=$rangeMin, rangeMax=$rangeMax, startIndex=$startIndex, endIndex=$endIndex');
-    print('[OrdinalTimeScale] Calculated _endIndex=$_endIndex');
+  }) : _fullDomain = fullDomain,
+       _rangeMin = rangeMin,
+       _rangeMax = rangeMax,
+       _startIndex = startIndex,
+       _endIndex = endIndex ?? (fullDomain.length - 1).toDouble(),
+       _step = 0 {
+    // print('[OrdinalTimeScale] Constructor: fullDomain.length=${fullDomain.length}, rangeMin=$rangeMin, rangeMax=$rangeMax, startIndex=$startIndex, endIndex=$endIndex');
+    // print('[OrdinalTimeScale] Calculated _endIndex=$_endIndex');
 
     // Calculate step size based on visible count
     // Use count (not range) to ensure all candles fit within pixel bounds
     final visibleCount = math.max(1, _endIndex - _startIndex + 1);
     _step = (_rangeMax - _rangeMin) / visibleCount;
 
-    print('[OrdinalTimeScale] visibleCount=$visibleCount, _step=$_step');
+    // print('[OrdinalTimeScale] visibleCount=$visibleCount, _step=$_step');
     if (_step.isNaN || _step.isInfinite) {
-      print('[OrdinalTimeScale] ERROR: _step is NaN or Infinite!');
+      // print('[OrdinalTimeScale] ERROR: _step is NaN or Infinite!');
     }
   }
 
@@ -85,7 +85,8 @@ class OrdinalTimeScale implements Scale<DateTime> {
     if (left == 0) return 0;
 
     // Check which neighbor is closer
-    final distLeft = (domain[left - 1].millisecondsSinceEpoch - targetTime).abs();
+    final distLeft = (domain[left - 1].millisecondsSinceEpoch - targetTime)
+        .abs();
     final distRight = (domain[left].millisecondsSinceEpoch - targetTime).abs();
 
     return distLeft <= distRight ? left - 1 : left;
@@ -98,15 +99,21 @@ class OrdinalTimeScale implements Scale<DateTime> {
   @override
   double scaledValue(DateTime value) {
     // Guard against invalid state
-    if (_fullDomain.isEmpty || _startIndex.isNaN || _endIndex.isNaN ||
-        _startIndex.isInfinite || _endIndex.isInfinite) {
+    if (_fullDomain.isEmpty ||
+        _startIndex.isNaN ||
+        _endIndex.isNaN ||
+        _startIndex.isInfinite ||
+        _endIndex.isInfinite) {
       return double.nan;
     }
 
     // Search buffered range (matching what studies render: visible ± 2)
     const buffer = 2;
     final searchStart = math.max(0, (_startIndex - buffer).floor());
-    final searchEnd = math.min(_fullDomain.length - 1, (_endIndex + buffer).ceil());
+    final searchEnd = math.min(
+      _fullDomain.length - 1,
+      (_endIndex + buffer).ceil(),
+    );
 
     // Search directly on fullDomain without slicing (performance optimization)
     final actualCandleIndex = _binarySearchTimestamp(
@@ -213,8 +220,11 @@ class OrdinalTimeScale implements Scale<DateTime> {
   /// Returns the visible domain array (subset of full domain).
   List<DateTime> getVisibleDomain() {
     // Guard against NaN or invalid indices
-    if (_fullDomain.isEmpty || _startIndex.isNaN || _endIndex.isNaN ||
-        _startIndex.isInfinite || _endIndex.isInfinite) {
+    if (_fullDomain.isEmpty ||
+        _startIndex.isNaN ||
+        _endIndex.isNaN ||
+        _startIndex.isInfinite ||
+        _endIndex.isInfinite) {
       return [];
     }
 

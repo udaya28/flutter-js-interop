@@ -33,7 +33,7 @@ class PerformanceTracker {
   static void log(String message) {
     if (!enabled) return;
     // ignore: avoid_print
-    print('[PERF] $message');
+    // print('[PERF] $message');
   }
 
   /// Measure an operation and return result

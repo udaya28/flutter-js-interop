@@ -20,7 +20,8 @@ enum TimeSeriesChangeType {
 }
 
 /// Callback function for time series data changes.
-typedef TimeSeriesChangeCallback = void Function(TimeSeriesChangeType changeType);
+typedef TimeSeriesChangeCallback =
+    void Function(TimeSeriesChangeType changeType);
 
 /// Simple time series store for OHLC candle data.
 /// Manages candle storage with automatic sorting and change notifications.
@@ -52,16 +53,18 @@ class TimeSeriesStore {
     }
 
     final lastCandle = _candles[_candles.length - 1];
-    final timestampsMatch = lastCandle.timestamp.millisecondsSinceEpoch == candle.timestamp.millisecondsSinceEpoch;
+    final timestampsMatch =
+        lastCandle.timestamp.millisecondsSinceEpoch ==
+        candle.timestamp.millisecondsSinceEpoch;
 
     if (timestampsMatch) {
       // Replace last candle - same timestamp
-      print('[TimeSeriesStore.add] UPDATE - replacing last candle: close ${lastCandle.close} → ${candle.close}');
+      // print('[TimeSeriesStore.add] UPDATE - replacing last candle: close ${lastCandle.close} → ${candle.close}');
       _candles[_candles.length - 1] = candle;
       _notify(TimeSeriesChangeType.update);
     } else {
       // Different timestamp - append new candle
-      print('[TimeSeriesStore.add] APPEND - new candle: ${candle.timestamp}');
+      // print('[TimeSeriesStore.add] APPEND - new candle: ${candle.timestamp}');
       _candles.add(candle);
       _notify(TimeSeriesChangeType.append);
     }
@@ -98,7 +101,11 @@ class TimeSeriesStore {
 
   /// Sort candles by timestamp in ascending order.
   void _sort() {
-    _candles.sort((a, b) => a.timestamp.millisecondsSinceEpoch.compareTo(b.timestamp.millisecondsSinceEpoch));
+    _candles.sort(
+      (a, b) => a.timestamp.millisecondsSinceEpoch.compareTo(
+        b.timestamp.millisecondsSinceEpoch,
+      ),
+    );
   }
 
   /// Notify change callback if set.

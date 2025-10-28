@@ -19,7 +19,7 @@ class SampleDataManager implements DataManager {
   /// @param data - All OHLC data (will be served in batches)
   /// @param batchSize - Number of candles to load per batch (default: 100)
   SampleDataManager(this._allData, {int batchSize = 100})
-      : _batchSize = batchSize;
+    : _batchSize = batchSize;
 
   /// Create a sample data manager with generated sine wave data.
   ///
@@ -48,14 +48,16 @@ class SampleDataManager implements DataManager {
       final low = (open < close ? open : close) - 0.3;
       final volume = 1000000.0 + (i % 10) * 100000.0;
 
-      data.add(OHLCData(
-        timestamp: timestamp,
-        open: open,
-        high: high,
-        low: low,
-        close: close,
-        volume: volume,
-      ));
+      data.add(
+        OHLCData(
+          timestamp: timestamp,
+          open: open,
+          high: high,
+          low: low,
+          close: close,
+          volume: volume,
+        ),
+      );
     }
 
     return SampleDataManager(data, batchSize: batchSize);
@@ -63,14 +65,14 @@ class SampleDataManager implements DataManager {
 
   @override
   Future<HistoricalBatch> loadHistorical() async {
-    print('[SampleDataManager.loadHistorical] Called: _allData.length=${_allData.length}, _loadedCount=$_loadedCount, _batchSize=$_batchSize');
+    // print('[SampleDataManager.loadHistorical] Called: _allData.length=${_allData.length}, _loadedCount=$_loadedCount, _batchSize=$_batchSize');
 
     // Simulate network delay
     await Future.delayed(const Duration(milliseconds: 100));
 
     if (_loadedCount >= _allData.length) {
       // No more data
-      print('[SampleDataManager.loadHistorical] No more data to load');
+      // print('[SampleDataManager.loadHistorical] No more data to load');
       return HistoricalBatch(candles: [], hasMore: false);
     }
 
@@ -81,7 +83,7 @@ class SampleDataManager implements DataManager {
 
     final hasMore = _loadedCount < _allData.length;
 
-    print('[SampleDataManager.loadHistorical] Returning batch: ${batch.length} candles, hasMore=$hasMore');
+    // print('[SampleDataManager.loadHistorical] Returning batch: ${batch.length} candles, hasMore=$hasMore');
 
     return HistoricalBatch(candles: batch, hasMore: hasMore);
   }
@@ -103,7 +105,8 @@ class SampleDataManager implements DataManager {
       high: lastCandle.close + 0.5,
       low: lastCandle.close - 0.5,
       close: lastCandle.close + (DateTime.now().second % 2 == 0 ? 0.3 : -0.3),
-      volume: lastCandle.volume * (0.9 + DateTime.now().millisecond / 1000 * 0.2),
+      volume:
+          lastCandle.volume * (0.9 + DateTime.now().millisecond / 1000 * 0.2),
     );
 
     _allData.add(newCandle);

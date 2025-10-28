@@ -42,7 +42,10 @@ class MultiPaneRenderer {
     this.timeAxis,
   ) {
     // Setup high-DPI and initial layout
-    compositor.setupHighDPI(context.config.size.width, context.config.size.height);
+    compositor.setupHighDPI(
+      context.config.size.width,
+      context.config.size.height,
+    );
     recalculateLayout();
   }
 
@@ -66,7 +69,7 @@ class MultiPaneRenderer {
   /// Called on layout changes (add/remove pane, resize, padding change).
   /// Public so Chart can trigger it after updating context.
   void recalculateLayout() {
-    print('[MultiPaneRenderer.recalculateLayout] Starting layout calculation');
+    // print('[MultiPaneRenderer.recalculateLayout] Starting layout calculation');
 
     // Get panes from manager
     final mainPane = _getMainPane();
@@ -75,10 +78,12 @@ class MultiPaneRenderer {
     // Calculate chart area (excluding padding)
     final chartAreaX = context.config.padding.left;
     final chartAreaY = context.config.padding.top;
-    final chartAreaWidth = context.config.size.width -
+    final chartAreaWidth =
+        context.config.size.width -
         context.config.padding.left -
         context.config.padding.right;
-    final chartAreaHeight = context.config.size.height -
+    final chartAreaHeight =
+        context.config.size.height -
         context.config.padding.top -
         context.config.padding.bottom;
 
@@ -117,12 +122,14 @@ class MultiPaneRenderer {
     // Sub-pane bounds
     for (final subPane in subPanes) {
       final height = availableHeight * subPane.heightPercent;
-      subPane.updateBounds(Bounds(
-        x: chartAreaX,
-        y: currentY,
-        width: chartAreaWidth,
-        height: height,
-      ));
+      subPane.updateBounds(
+        Bounds(
+          x: chartAreaX,
+          y: currentY,
+          width: chartAreaWidth,
+          height: height,
+        ),
+      );
       currentY += height + paneSpacing;
     }
 
@@ -151,10 +158,12 @@ class MultiPaneRenderer {
     // Calculate chart area bounds
     final chartAreaX = context.config.padding.left;
     final chartAreaY = context.config.padding.top;
-    final chartAreaWidth = context.config.size.width -
+    final chartAreaWidth =
+        context.config.size.width -
         context.config.padding.left -
         context.config.padding.right;
-    final chartAreaHeight = context.config.size.height -
+    final chartAreaHeight =
+        context.config.size.height -
         context.config.padding.top -
         context.config.padding.bottom;
 
@@ -182,12 +191,14 @@ class MultiPaneRenderer {
     }
 
     // Layer 2.6: Chart border (below axis lines)
-    compositor.drawBorder(Bounds(
-      x: chartAreaX,
-      y: chartAreaY,
-      width: chartAreaWidth,
-      height: chartAreaHeight,
-    ));
+    compositor.drawBorder(
+      Bounds(
+        x: chartAreaX,
+        y: chartAreaY,
+        width: chartAreaWidth,
+        height: chartAreaHeight,
+      ),
+    );
 
     // Layer 3: Axis lines
     final mainAxisLine = mainPane.generatePriceAxisLineShape();
@@ -200,7 +211,9 @@ class MultiPaneRenderer {
         compositor.renderShapes([axisLine]);
       }
     }
-    final lastPaneBounds = subPanes.isNotEmpty ? subPanes.last.bounds : mainPane.bounds;
+    final lastPaneBounds = subPanes.isNotEmpty
+        ? subPanes.last.bounds
+        : mainPane.bounds;
     final axisLine = timeAxis.generateAxisLineShape(lastPaneBounds);
     if (axisLine != null) {
       compositor.renderShapes([axisLine]);

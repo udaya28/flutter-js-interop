@@ -249,7 +249,7 @@ onMounted(() => {
       cleanupTasks.push(bridgeDisposer);
 
       if (candles.length > 0) {
-        dataManager.setHistoricalData({ series: candles }, false);
+        dataManager.setHistoricalData({ series: candles });
       }
     } catch {
       // Swallow initialization failures to keep UI responsive.
